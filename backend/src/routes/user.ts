@@ -2,7 +2,7 @@ import { PrismaClient } from "@prisma/client/edge";
 import { withAccelerate } from "@prisma/extension-accelerate";
 import { Hono } from "hono";
 import {sign} from 'hono/jwt';
-
+import { signinInput, signupInput } from "@srinju/medium-common";
 
 export const userrouter = new Hono<{
     Bindings : {
@@ -14,6 +14,14 @@ export const userrouter = new Hono<{
 userrouter.post('/signup' ,async (c) => {
     
     const body = await c.req.json();
+    const {success} = signupInput.safeParse(body);
+
+    if(!success){
+        c.status(411);
+        return c.json({
+            message : "incorrect inputs"
+        });
+    }
 
     const prisma = new PrismaClient({
         datasources : {
@@ -22,6 +30,8 @@ userrouter.post('/signup' ,async (c) => {
             }
         }
     }).$extends(withAccelerate());
+
+    //find unique check the database if the user with the same creds already exists in our db or not 
 
     try {
         const user = await prisma.user.create({
@@ -37,7 +47,7 @@ userrouter.post('/signup' ,async (c) => {
         },c.env.JWT_SECRET);
     
         return c.json({
-            jwt : token
+            token
         });
     } catch(e) {
         console.log(e);
@@ -53,6 +63,14 @@ userrouter.post('/signin' , async (c) => {
     //if the user exists then sign in 
 
     const body = await c.req.json();
+    const {success} = signinInput.safeParse(body);
+
+    if(!success){
+        c.status(411); //length required
+        return c.json({
+            message : "incorrect inputs!!"
+        })
+    }
 
     const prisma = new PrismaClient({
         datasources : {
@@ -77,12 +95,12 @@ userrouter.post('/signin' , async (c) => {
             });
         }
 
-        const jwt = await sign({
+        const token = await sign({
             id : user.id
         } , c.env.JWT_SECRET);
 
         return c.json({
-            token : jwt
+            token 
         });
 
     } catch(e) {
